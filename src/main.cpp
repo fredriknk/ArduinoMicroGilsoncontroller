@@ -8,6 +8,9 @@ String run_state = "STOPPED";   // Track motor state
 String direction = "CW";        // Track motor direction
 int pwm_value = 255;            // Track last PWM duty cycle
 
+unsigned long lastCommandMillis = 0;       // Tracks the last time we received a command
+const unsigned long commandTimeout = 20000; // 20 seconds in milliseconds
+
 void setup() {
   Serial.begin(9600);
 
@@ -31,6 +34,8 @@ void loop() {
   // Read single-char commands:
   while (Serial.available() > 0) {
     char input = Serial.read();
+    // Record time command was received
+    lastCommandMillis = millis();
 
     switch (input) {
       case 'L':  // CW direction
@@ -58,7 +63,7 @@ void loop() {
         break;
 
       case '0':
-        pwm_value = 25; 
+        pwm_value = 25;
         analogWrite(PWM_PIN, pwm_value);
         Serial.println("PWM set to 25");
         break;
@@ -118,7 +123,6 @@ void loop() {
         break;
 
       case '?':  // Return current status
-        // e.g. RUNNING, CW, 125
         Serial.print(run_state);
         Serial.print(",");
         Serial.print(direction);
@@ -130,6 +134,16 @@ void loop() {
         // Unknown command
         Serial.println("Unknown command.");
         break;
+    }
+  }
+
+  // Check for command timeout
+  if (millis() - lastCommandMillis >= commandTimeout) {
+    // Time out condition met: stop the motor if not already stopped
+    if (run_state == "RUNNING") {
+      digitalWrite(RUN_PIN, HIGH);
+      run_state = "STOPPED";
+      Serial.println("Timeout: Stopping Motor");
     }
   }
 }
